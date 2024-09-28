@@ -1,175 +1,117 @@
-provider "aws" {
-  region = "ap-south-1"
+provider "azurerm" {
+  features {}
 }
 
-resource "aws_vpc" "devopsshack_vpc" {
-  cidr_block = "10.0.0.0/16"
-
-  tags = {
-    Name = "devopsshack-vpc"
-  }
+# Resource Group
+resource "azurerm_resource_group" "r_grp" {
+  name     = "r-grp"
+  location = "Japan East"
 }
 
-resource "aws_subnet" "devopsshack_subnet" {
-  count = 2
-  vpc_id                  = aws_vpc.devopsshack_vpc.id
-  cidr_block              = cidrsubnet(aws_vpc.devopsshack_vpc.cidr_block, 8, count.index)
-  availability_zone       = element(["ap-south-1a", "ap-south-1b"], count.index)
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "devopsshack-subnet-${count.index}"
-  }
+# Virtual Network
+resource "azurerm_virtual_network" "vnet" {
+  name                = "vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.r_grp.location
+  resource_group_name = azurerm_resource_group.r_grp.name
 }
 
-resource "aws_internet_gateway" "devopsshack_igw" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
-
-  tags = {
-    Name = "devopsshack-igw"
-  }
+# Subnet
+resource "azurerm_subnet" "subnet" {
+  name                 = "subnet"
+  resource_group_name  = azurerm_resource_group.r_grp.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
 }
 
-resource "aws_route_table" "devopsshack_route_table" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
+# Network Interface
+resource "azurerm_network_interface" "nic" {
+  name                = "server711_z1"
+  location            = azurerm_resource_group.r_grp.location
+  resource_group_name = azurerm_resource_group.r_grp.name
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.devopsshack_igw.id
-  }
-
-  tags = {
-    Name = "devopsshack-route-table"
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
   }
 }
 
-resource "aws_route_table_association" "a" {
-  count          = 2
-  subnet_id      = aws_subnet.devopsshack_subnet[count.index].id
-  route_table_id = aws_route_table.devopsshack_route_table.id
+# Public IP
+resource "azurerm_public_ip" "public_ip" {
+  name                = "server_public_ip"
+  location            = azurerm_resource_group.r_grp.location
+  resource_group_name = azurerm_resource_group.r_grp.name
+  allocation_method   = "Dynamic"
 }
 
-resource "aws_security_group" "devopsshack_cluster_sg" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "devopsshack-cluster-sg"
-  }
+# Network Security Group
+resource "azurerm_network_security_group" "nsg" {
+  name                = "server-nsg"
+  location            = azurerm_resource_group.r_grp.location
+  resource_group_name = azurerm_resource_group.r_grp.name
 }
 
-resource "aws_security_group" "devopsshack_node_sg" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
-
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "devopsshack-node-sg"
-  }
+# NSG Rule to Allow SSH
+resource "azurerm_network_security_rule" "allow_ssh" {
+  name                        = "allow_ssh"
+  priority                    = 1001
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  network_security_group_name = azurerm_network_security_group.nsg.name
 }
 
-resource "aws_eks_cluster" "devopsshack" {
-  name     = "devopsshack-cluster"
-  role_arn = aws_iam_role.devopsshack_cluster_role.arn
+# Virtual Machine
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = "Server"
+  resource_group_name = azurerm_resource_group.r_grp.name
+  location            = azurerm_resource_group.r_grp.location
+  size                = "Standard_D4s_v3"
+  admin_username      = "ubuntu"
 
-  vpc_config {
-    subnet_ids         = aws_subnet.devopsshack_subnet[*].id
-    security_group_ids = [aws_security_group.devopsshack_cluster_sg.id]
-  }
-}
-
-resource "aws_eks_node_group" "devopsshack" {
-  cluster_name    = aws_eks_cluster.devopsshack.name
-  node_group_name = "devopsshack-node-group"
-  node_role_arn   = aws_iam_role.devopsshack_node_group_role.arn
-  subnet_ids      = aws_subnet.devopsshack_subnet[*].id
-
-  scaling_config {
-    desired_size = 3
-    max_size     = 3
-    min_size     = 3
-  }
-
-  instance_types = ["t2.large"]
-
-  remote_access {
-    ec2_ssh_key = var.ssh_key_name
-    source_security_group_ids = [aws_security_group.devopsshack_node_sg.id]
-  }
-}
-
-resource "aws_iam_role" "devopsshack_cluster_role" {
-  name = "devopsshack-cluster-role"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "eks.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
+  network_interface_ids = [
+    azurerm_network_interface.nic.id
   ]
-}
-EOF
-}
 
-resource "aws_iam_role_policy_attachment" "devopsshack_cluster_role_policy" {
-  role       = aws_iam_role.devopsshack_cluster_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-}
+  os_disk {
+    name              = "Server_OsDisk"
+    caching           = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+    disk_size_gb      = 30
+  }
 
-resource "aws_iam_role" "devopsshack_node_group_role" {
-  name = "devopsshack-node-group-role"
+  source_image_reference {
+    publisher = "canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
+    version   = "latest"
+  }
 
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = "ubuntu"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCqStzY7XfVrPLYDcRgDfMRTBQa1q0jdqljjPz7P8zJnANLq75DUkBVTfXBvL+rppKZzZL7/yLFOghXg27hL7sguBliaEN+VIaQyP810stkg8EAKUEEjxMa7jiYXgTfI5H9xCXkdkiEuNteBkDwIpV9pItnDsaSi7M7mRMAXpNGoimg+iSpaxsxYEfN5VCdPpFwhrv5pTffNjXAbogpf28uIHcljgw9PhkB1Ti0QlR7rx4cOl7BEJ0c/ma7VuNidccd6yWQP1p6O6OH6ljZkvmTbp3sF1uXg4mhBMHRL3VoQaNLHYgMc/aoUn63bBHinDEAFYEr5EmukffAkilv8CPumOngmnB8Wuh47NoEXsw9Mw+IXBCIF9RXZtbktS9x4HC9gxmYp9XUH8I39gXGJdwsXfci4u9HOyc83H5Y9e7as02wDe4awfYwjlKS/l+xgxlQ56eVNbZGxw+L3dd1My81UhMlmbUc3gqgBLC1SHQHPpglHXOlpVomWRl0d06DOoU= generated-by-azure"
+  }
+
+  boot_diagnostics {
+    enabled = true
+  }
+
+  security_profile {
+    uefi_settings {
+      secure_boot_enabled = true
+      v_tpm_enabled       = true
     }
-  ]
-}
-EOF
-}
+    security_type = "TrustedLaunch"
+  }
 
-resource "aws_iam_role_policy_attachment" "devopsshack_node_group_role_policy" {
-  role       = aws_iam_role.devopsshack_node_group_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "devopsshack_node_group_cni_policy" {
-  role       = aws_iam_role.devopsshack_node_group_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-}
-
-resource "aws_iam_role_policy_attachment" "devopsshack_node_group_registry_policy" {
-  role       = aws_iam_role.devopsshack_node_group_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  tags = {
+    environment = "production"
+  }
 }
