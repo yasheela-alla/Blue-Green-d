@@ -1,16 +1,15 @@
-output "cluster_id" {
-  value = aws_eks_cluster.devopsshack.id
+output "vm_id" {
+  value = azurerm_linux_virtual_machine.Server.id
 }
 
-output "node_group_id" {
-  value = aws_eks_node_group.devopsshack.id
+output "public_ip" {
+  value = azurerm_public_ip.Server_ip.id
 }
 
-output "vpc_id" {
-  value = aws_vpc.devopsshack_vpc.id
+output "resource_group" {
+  value = azurerm_resource_group.r_grp.name
 }
 
-output "subnet_ids" {
-  value = aws_subnet.devopsshack_subnet[*].id
+output "network_interface_ids" {
+  value = azurerm_network_interface.Server_nic.id
 }
-
