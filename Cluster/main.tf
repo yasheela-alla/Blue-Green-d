@@ -63,6 +63,7 @@ resource "azurerm_network_security_rule" "allow_ssh" {
   destination_port_range      = "22"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.r_grp.name
   network_security_group_name = azurerm_network_security_group.nsg.name
 }
 
@@ -79,15 +80,15 @@ resource "azurerm_linux_virtual_machine" "vm" {
   ]
 
   os_disk {
-    name              = "Server_OsDisk"
-    caching           = "ReadWrite"
+    name                = "Server_OsDisk"
+    caching             = "ReadWrite"
     storage_account_type = "Premium_LRS"
-    disk_size_gb      = 30
+    disk_size_gb        = 30
   }
 
   source_image_reference {
     publisher = "canonical"
-    offer     = "ubuntu-24_04-lts"
+    offer     = "ubuntu-22.04-lts"  # Corrected version to 22.04 LTS
     sku       = "server"
     version   = "latest"
   }
@@ -96,22 +97,35 @@ resource "azurerm_linux_virtual_machine" "vm" {
 
   admin_ssh_key {
     username   = "ubuntu"
-    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCqStzY7XfVrPLYDcRgDfMRTBQa1q0jdqljjPz7P8zJnANLq75DUkBVTfXBvL+rppKZzZL7/yLFOghXg27hL7sguBliaEN+VIaQyP810stkg8EAKUEEjxMa7jiYXgTfI5H9xCXkdkiEuNteBkDwIpV9pItnDsaSi7M7mRMAXpNGoimg+iSpaxsxYEfN5VCdPpFwhrv5pTffNjXAbogpf28uIHcljgw9PhkB1Ti0QlR7rx4cOl7BEJ0c/ma7VuNidccd6yWQP1p6O6OH6ljZkvmTbp3sF1uXg4mhBMHRL3VoQaNLHYgMc/aoUn63bBHinDEAFYEr5EmukffAkilv8CPumOngmnB8Wuh47NoEXsw9Mw+IXBCIF9RXZtbktS9x4HC9gxmYp9XUH8I39gXGJdwsXfci4u9HOyc83H5Y9e7as02wDe4awfYwjlKS/l+xgxlQ56eVNbZGxw+L3dd1My81UhMlmbUc3gqgBLC1SHQHPpglHXOlpVomWRl0d06DOoU= generated-by-azure"
+    public_key = "ssh-rsa AAAAB3... generated-by-azure"
   }
 
+  # Optional: Uncomment if you have a storage account
+  /*
   boot_diagnostics {
-    enabled = true
+    enabled     = true
+    storage_uri = azurerm_storage_account.your_storage_account.primary_blob_endpoint
   }
-
-  security_profile {
-    uefi_settings {
-      secure_boot_enabled = true
-      v_tpm_enabled       = true
-    }
-    security_type = "TrustedLaunch"
-  }
+  */
 
   tags = {
     environment = "production"
   }
+}
+
+# Outputs
+output "vm_id" {
+  value = azurerm_linux_virtual_machine.vm.id
+}
+
+output "public_ip" {
+  value = azurerm_public_ip.public_ip.id
+}
+
+output "network_interface_ids" {
+  value = azurerm_network_interface.nic.id
+}
+
+output "resource_group" {
+  value = azurerm_resource_group.r_grp.name
 }
