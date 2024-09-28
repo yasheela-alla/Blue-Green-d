@@ -2,60 +2,57 @@ provider "azurerm" {
   features {}
 }
 
-# Resource Group
-resource "azurerm_resource_group" "r_grp" {
+resource "azurerm_resource_group" "rg" {
   name     = "r-grp"
-  location = "Japan East"
+  location = "East Japan"
 }
 
-# Virtual Network
 resource "azurerm_virtual_network" "vnet" {
-  name                = "vnet"
+  name                = "yasheela-vnet"
+  resource_group_name = azurerm_resource_group.rg.name
   address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.r_grp.location
-  resource_group_name = azurerm_resource_group.r_grp.name
-}
 
-# Subnet
-resource "azurerm_subnet" "subnet" {
-  name                 = "subnet"
-  resource_group_name  = azurerm_resource_group.r_grp.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Network Interface
-resource "azurerm_network_interface" "nic" {
-  name                = "server711_z1"
-  location            = azurerm_resource_group.r_grp.location
-  resource_group_name = azurerm_resource_group.r_grp.name
-
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
+  tags = {
+    Name = "yasheela-vnet"
   }
 }
 
-# Public IP
+resource "azurerm_subnet" "subnet" {
+  count               = 2
+  name                = "yasheela-subnet-${count.index}"
+  resource_group_name = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes    = ["10.0.${count.index}.0/24"]
+
+  tags = {
+    Name = "yasheela-subnet-${count.index}"
+  }
+}
+
 resource "azurerm_public_ip" "public_ip" {
-  name                = "server_public_ip"
-  location            = azurerm_resource_group.r_grp.location
-  resource_group_name = azurerm_resource_group.r_grp.name
-  allocation_method   = "Dynamic"
+  name                = "yasheela-public-ip"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  allocation_method   = "Static"
+
+  tags = {
+    Name = "yasheela-public-ip"
+  }
 }
 
-# Network Security Group
 resource "azurerm_network_security_group" "nsg" {
-  name                = "server-nsg"
-  location            = azurerm_resource_group.r_grp.location
-  resource_group_name = azurerm_resource_group.r_grp.name
+  name                = "yasheela-nsg"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+
+  tags = {
+    Name = "yasheela-nsg"
+  }
 }
 
-# NSG Rule to Allow SSH
 resource "azurerm_network_security_rule" "allow_ssh" {
-  name                        = "allow_ssh"
-  priority                    = 1001
+  name                        = "Allow-SSH"
+  priority                    = 100
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
@@ -63,48 +60,60 @@ resource "azurerm_network_security_rule" "allow_ssh" {
   destination_port_range      = "22"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = azurerm_network_security_group.nsg.resource_group_name
   network_security_group_name = azurerm_network_security_group.nsg.name
+  resource_group_name         = azurerm_resource_group.rg.name
 }
 
-# Virtual Machine
-resource "azurerm_linux_virtual_machine" "vm" {
-  name                = "Server"
-  resource_group_name = azurerm_resource_group.r_grp.name
-  location            = azurerm_resource_group.r_grp.location
-  size                = "Standard_D4s_v3"
-  admin_username      = "ubuntu"
+resource "azurerm_kubernetes_cluster" "aks" {
+  name                = "yasheela-aks"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  dns_prefix          = "yasheela"
 
-  network_interface_ids = [
-    azurerm_network_interface.nic.id
-  ]
-
-  os_disk {
-    name                = "Server_OsDisk"
-    caching             = "ReadWrite"
-    storage_account_type = "Premium_LRS"
-    disk_size_gb       = 30
+  agent_pool_profile {
+    name       = "agentpool"
+    count      = 3
+    vm_size    = "Standard_DS2_v2"
+    os_type    = "Linux"
+    max_pods   = 110
+    mode       = "System"
+    availability_zone = ["1", "2", "3"]
   }
 
-  source_image_reference {
-    publisher = "canonical"
-    offer     = "ubuntu-24_04-lts"
-    sku       = "server"
-    version   = "latest"
+  linux_profile {
+    admin_username = "azureuser"
+    ssh_key {
+      key_data = var.ssh_key
+    }
   }
 
-  disable_password_authentication = true
-
-  admin_ssh_key {
-    username   = "ubuntu"
-    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCqStzY7XfVrPLYDcRgDfMRTBQa1q0jdqljjPz7P8zJnANLq75DUkBVTfXBvL+rppKZzZL7/yLFOghXg27hL7sguBliaEN+VIaQyP810stkg8EAKUEEjxMa7jiYXgTfI5H9xCXkdkiEuNteBkDwIpV9pItnDsaSi7M7mRMAXpNGoimg+iSpaxsxYEfN5VCdPpFwhrv5pTffNjXAbogpf28uIHcljgw9PhkB1Ti0QlR7rx4cOl7BEJ0c/ma7VuNidccd6yWQP1p6O6OH6ljZkvmTbp3sF1uXg4mhBMHRL3VoQaNLHYgMc/aoUn63bBHinDEAFYEr5EmukffAkilv8CPumOngmnB8Wuh47NoEXsw9Mw+IXBCIF9RXZtbktS9x4HC9gxmYp9XUH8I39gXGJdwsXfci4u9HOyc83H5Y9e7as02wDe4awfYwjlKS/l+xgxlQ56eVNbZGxw+L3dd1My81UhMlmbUc3gqgBLC1SHQHPpglHXOlpVomWRl0d06DOoU= generated-by-azure"
+  service_principal {
+    client_id     = var.client_id
+    client_secret = var.client_secret
   }
 
-  boot_diagnostics {
-    storage_account_type = "StandardLRS" # Specify the type here
+  role_based_access_control {
+    enabled = true
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    load_balancer_sku = "standard"
   }
 
   tags = {
-    environment = "production"
+    Name = "yasheela-aks"
   }
+}
+
+variable "ssh_key" {
+  description = "SSH public key for the AKS cluster"
+}
+
+variable "client_id" {
+  description = "Client ID of the Service Principal"
+}
+
+variable "client_secret" {
+  description = "Client Secret of the Service Principal"
 }
