@@ -11,11 +11,10 @@ pipeline {
     }
     
     environment {
-        SCANNER_HOME= tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar-scanner'
         IMAGE_NAME = "allayasheela/bankapp"
         TAG = "${params.DOCKER_TAG}"  // The image tag now comes from the parameter
         KUBE_NAMESPACE = 'webapps'
-        
     }
 
     stages {
@@ -47,17 +46,15 @@ pipeline {
         
         stage('Switch Traffic Between Blue & Green Environment') {
             when {
-                expression { return params.SWITCH_TRAFFIC }
+                expression { params.SWITCH_TRAFFIC }
             }
             steps {
                 script {
                     def newEnv = params.DEPLOY_ENV
-
-                    // Always switch traffic based on DEPLOY_ENV
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
-                        sh '''
-                            kubectl patch service bankapp-service -p "{\\"spec\\": {\\"selector\\": {\\"app\\": \\"bankapp\\", \\"version\\": \\"''' + newEnv + '''\\"}}}" -n ${KUBE_NAMESPACE}
-                        '''
+                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', credentialsId: 'k8-token', namespace: 'webapps') {
+                        sh """
+                            kubectl patch service bankapp-service -p "{\"spec\": {\"selector\": {\"app\": \"bankapp\", \"version\": \"${newEnv}\"}}}}" -n ${KUBE_NAMESPACE}
+                        """
                     }
                     echo "Traffic has been switched to the ${newEnv} environment."
                 }
@@ -65,26 +62,25 @@ pipeline {
         }
 
         stage('Verify Deployment') {
-    steps {
-        script {
-            def verifyEnv = params.DEPLOY_ENV
-            
-            // Optional: Run Maven build (if needed)
-            // sh 'mvn clean install'
+            steps {
+                script {
+                    def verifyEnv = params.DEPLOY_ENV
 
-            withKubeConfig(credentialsId: 'k8-token', namespace: 'webapps') {
-                def podStatus = sh(script: "kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE} -o jsonpath='{.items[*].status.phase}'", returnStdout: true).trim()
+                    withKubeConfig(credentialsId: 'k8-token', namespace: 'webapps') {
+                        // Check the status of the pods
+                        def podStatus = sh(script: "kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE} -o jsonpath='{.items[*].status.phase}'", returnStdout: true).trim()
 
-                if (podStatus == 'Running') {
-                    sh """
-                    kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
-                    kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
-                    """
-                } else {
-                    error "Pod is not running. Current status: ${podStatus}"
+                        if (podStatus.contains('Running')) {
+                            sh """
+                            kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
+                            kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
+                            """
+                        } else {
+                            error "Pod is not running. Current status: ${podStatus}"
+                        }
+                    }
                 }
             }
         }
-    }
-}
-
+    } // Closing the stages block
+} // Closing the pipeline block
