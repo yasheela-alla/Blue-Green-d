@@ -9,7 +9,7 @@ resource "azurerm_virtual_network" "yasheela_vnet" {
   name                = "yasheela-vnet"
   address_space       = [var.vnet_cidr]
   location            = var.location
-  resource_group_name = azurerm_resource_group.yasheela_rg.name
+  resource_group_name = azurerm_resource_group.r-grp.name
 }
 
 # Subnets
@@ -25,7 +25,7 @@ resource "azurerm_subnet" "yasheela_subnet" {
 resource "azurerm_network_security_group" "yasheela_nsg" {
   name                = "yasheela-nsg"
   location            = var.location
-  resource_group_name = azurerm_resource_group.yasheela_rg.name
+  resource_group_name = azurerm_resource_group.r-grp.name
 
   security_rule {
     name                       = "AllowAllOutbound"
@@ -44,7 +44,7 @@ resource "azurerm_network_security_group" "yasheela_nsg" {
 resource "azurerm_kubernetes_cluster" "yasheela_aks" {
   name                = "yasheela-aks"
   location            = var.location
-  resource_group_name = azurerm_resource_group.yasheela_rg.name
+  resource_group_name = azurerm_resource_group.r-grp.name
   dns_prefix          = "yasheelaaks"
 
   default_node_pool {
@@ -67,15 +67,15 @@ resource "azurerm_kubernetes_cluster" "yasheela_aks" {
 }
 
 # SSH Key for Node Access
-resource "azurerm_ssh_public_key" "yasheela_ssh_key" {
+resource "azurerm_ssh_public_key" "Server_ssh_key" {
   name                = "yasheela-ssh-key"
   location            = var.location
-  resource_group_name = azurerm_resource_group.yasheela_rg.name
+  resource_group_name = azurerm_resource_group.r-grp.name
   public_key          = file(var.ssh_key_name)
 }
 
 # Node Security Group for SSH Access
-resource "azurerm_network_security_rule" "yasheela_ssh" {
+resource "azurerm_network_security_rule" "allow_ssh" {
   name                        = "SSHAllowRule"
   priority                    = 101
   direction                   = "Inbound"
@@ -85,6 +85,6 @@ resource "azurerm_network_security_rule" "yasheela_ssh" {
   destination_port_range      = "22"
   source_address_prefix        = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = azurerm_resource_group.yasheela_rg.name
+  resource_group_name         = azurerm_resource_group.r-grp.name
   network_security_group_name = azurerm_network_security_group.yasheela_nsg.name
 }
