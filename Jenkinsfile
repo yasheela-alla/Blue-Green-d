@@ -63,19 +63,28 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Verify Deployment') {
-            steps {
-                script {
-                    def verifyEnv = params.DEPLOY_ENV
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
-                        sh """
-                        kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
-                        kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
-                        """
-                    }
+    steps {
+        script {
+            def verifyEnv = params.DEPLOY_ENV
+            
+            // Optional: Run Maven build (if needed)
+            // sh 'mvn clean install'
+
+            withKubeConfig(credentialsId: 'k8-token', namespace: 'webapps') {
+                def podStatus = sh(script: "kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE} -o jsonpath='{.items[*].status.phase}'", returnStdout: true).trim()
+
+                if (podStatus == 'Running') {
+                    sh """
+                    kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
+                    kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
+                    """
+                } else {
+                    error "Pod is not running. Current status: ${podStatus}"
                 }
             }
         }
     }
 }
+
