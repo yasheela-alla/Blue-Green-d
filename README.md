@@ -25,7 +25,7 @@ This repository contains an implementation of the Blue-Green Deployment strategy
 
 ## Architecture
 
-![Architecture Diagram](architecture.png)
+![Architecture Diagram][architecture.png]
 
 This diagram illustrates the architecture of the Blue-Green Deployment strategy implemented in this project.
 
