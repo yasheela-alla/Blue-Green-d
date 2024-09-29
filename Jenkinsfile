@@ -36,11 +36,11 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar') {
-                    sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=nodejsmysql -Dsonar.projectName=nodejsmysql"
-                }
-            }
+                    sh "$SCANNER_HOME/bin/sonar-scanner -X -Dsonar.projectKey=nodejsmysql -Dsonar.projectName=nodejsmysql"
+               }
+           }
         }
-        
+
         stage('Quality Gate Check') {
             steps {
                 timeout(time: 1, unit: 'HOURS') {
