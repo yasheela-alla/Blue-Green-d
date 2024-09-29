@@ -1,8 +1,5 @@
 pipeline {
     agent any
-    tools {
-        maven 'maven3'
-    }
     
     parameters {
         choice(name: 'DEPLOY_ENV', choices: ['blue', 'green'], description: 'Choose which environment to deploy: Blue or Green')
@@ -11,22 +8,24 @@ pipeline {
     }
     
     environment {
-        SCANNER_HOME = tool 'sonar-scanner'
         IMAGE_NAME = "allayasheela/bankapp"
-        TAG = "${params.DOCKER_TAG}"  // The image tag now comes from the parameter
+        TAG = "${params.DOCKER_TAG}"  
         KUBE_NAMESPACE = 'webapps'
+        SCANNER_HOME= tool 'sonar-scanner'
     }
 
     stages {
         stage('Git Checkout') {
             steps {
-                git branch: 'main', credentialsId: 'git-cred', url: 'https://github.com/yasheela-alla/Bank-App.git'
+                git branch: 'main', credentialsId: 'git-cred', url: 'https://github.com/allayasheela/bankapp.git'
             }
         }
         
-        stage('Tests') {
+        stage('SonarQube Analysis') {
             steps {
-                sh "mvn test -DskipTests=true"
+                withSonarQubeEnv('sonar') {
+                    sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=nodejsmysql -Dsonar.projectName=nodejsmysql"
+                }
             }
         }
         
@@ -36,25 +35,84 @@ pipeline {
             }
         }
         
-        stage('SonarQube Analysis') {
+        stage('Docker build') {
             steps {
-                withSonarQubeEnv('sonar') {
-                    sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=nodejsmysql -Dsonar.projectName=nodejsmysql -Dsonar.java.binaries=target/classes"
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        sh "docker build -t ${IMAGE_NAME}:${TAG} ."
+                    }
+                }
+            }
+        }
+        
+        stage('Trivy Image Scan') {
+            steps {
+                sh "trivy image --format table -o image.html ${IMAGE_NAME}:${TAG}"
+            }
+        }
+        
+        stage('Docker Push Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        sh "docker push ${IMAGE_NAME}:${TAG}"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy MySQL Deployment and Service') {
+            steps {
+                script {
+                    withKubeConfig(caCertificate: '', clusterName: 'devopsshack-cluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
+                        sh "kubectl apply -f mysql-ds.yml -n ${KUBE_NAMESPACE}" 
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy SVC-APP') {
+            steps {
+                script {
+                    withKubeConfig(caCertificate: '', clusterName: 'devopsshack-cluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
+                        sh """ if ! kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}; then
+                                kubectl apply -f bankapp-service.yml -n ${KUBE_NAMESPACE}
+                              fi
+                        """
+                   }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    def deploymentFile = ""
+                    if (params.DEPLOY_ENV == 'blue') {
+                        deploymentFile = 'app-deployment-blue.yml'
+                    } else {
+                        deploymentFile = 'app-deployment-green.yml'
+                    }
+
+                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
+                        sh "kubectl apply -f ${deploymentFile} -n ${KUBE_NAMESPACE}"
+                    }
                 }
             }
         }
         
         stage('Switch Traffic Between Blue & Green Environment') {
             when {
-                expression { params.SWITCH_TRAFFIC }
+                expression { return params.SWITCH_TRAFFIC }
             }
             steps {
                 script {
                     def newEnv = params.DEPLOY_ENV
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', credentialsId: 'k8-token', namespace: 'webapps') {
-                        sh """
-                            kubectl patch service bankapp-service -p "{\"spec\": {\"selector\": {\"app\": \"bankapp\", \"version\": \"${newEnv}\"}}}}" -n ${KUBE_NAMESPACE}
-                        """
+
+                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
+                        sh '''
+                            kubectl patch service bankapp-service -p "{\\"spec\\": {\\"selector\\": {\\"app\\": \\"bankapp\\", \\"version\\": \\"''' + newEnv + '''\\"}}}" -n ${KUBE_NAMESPACE}
+                        '''
                     }
                     echo "Traffic has been switched to the ${newEnv} environment."
                 }
@@ -63,8 +121,16 @@ pipeline {
         
         stage('Verify Deployment') {
             steps {
-                sh "mvn test -DskipTests=true"
-         }
-      } // Closing the stages block
-   } // Closing the pipeline block
+                script {
+                    def verifyEnv = params.DEPLOY_ENV
+                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
+                        sh """
+                        kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
+                        kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
+                        """
+                    }
+                }
+            }
+        }
+    }
 }
