@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    tools {
+        maven 'maven3'
+    }
     
     parameters {
         choice(name: 'DEPLOY_ENV', choices: ['blue', 'green'], description: 'Choose which environment to deploy: Blue or Green')
@@ -8,10 +11,11 @@ pipeline {
     }
     
     environment {
+        SCANNER_HOME= tool 'sonar-scanner'
         IMAGE_NAME = "allayasheela/bankapp"
         TAG = "${params.DOCKER_TAG}"  // The image tag now comes from the parameter
         KUBE_NAMESPACE = 'webapps'
-        SCANNER_HOME= tool 'sonar-scanner'
+        
     }
 
     stages {
@@ -41,15 +45,21 @@ pipeline {
             }
         }
         
+        stage('build') {
+            steps {
+                sh "mvn deploy -DskipTests=true"
+            }
+        }
+        
         stage('Publish Artifact To Nexus') {
             steps {
-                withMaven(globalMavenSettingsConfig:'maven-settings',jdk:", maven:'maven3', mavenSettingsConfig:", traceability:true) {
-                        sh "mvn deploy -DskipTests=true"
+                withMaven(globalMavenSettingsConfig: 'maven-settings', maven: 'maven3', mavenSettingsConfig: '', traceability: true) {
+                    sh "mvn deploy -DskipTests=true"
                 }
             }
         }
         
-        stage('Docker build') {
+        stage('Docker build & Tag Image') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker-cred') {
@@ -69,7 +79,7 @@ pipeline {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker-cred') {
-                        sh "docker push ${IMAGE_NAME}:${TAG}"
+                        sh "docker push ${IMAGE_NAME}:${TAG} ."
                     }
                 }
             }
