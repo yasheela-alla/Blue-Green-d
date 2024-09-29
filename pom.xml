@@ -1,40 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.3</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>bankapp</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>bankapp</name>
+    <description>Banking Web Application</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.thymeleaf.extras</groupId>
+            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludeDevtools>true</excludeDevtools>
+                    <skip>true</skip> <!-- Skip JAR creation -->
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
-Sending build context to Docker daemon  58.58MB
-Step 1/10 : FROM eclipse-temurin:17-jdk-alpine AS builder
- ---> 6afd128b0d03
-Step 2/10 : WORKDIR /usr/src/app
- ---> Using cache
- ---> e4bc0450dd2c
-Step 3/10 : COPY src/main/java/ src/main/java/
- ---> Using cache
- ---> 711c0452dffa
-Step 4/10 : COPY src/main/resources/ src/main/resources/
- ---> Using cache
- ---> 35c7fb07cbcc
-Step 5/10 : RUN apk add --no-cache maven
- ---> Using cache
- ---> 7fe03ecd26f5
-Step 6/10 : RUN javac src/main/java/com/example/bankapp/*.java -d out
- ---> Running in eb79fa3952da
-src/main/java/com/example/bankapp/BankappApplication.java:3: error: package org.springframework.boot does not exist
-import org.springframework.boot.SpringApplication;
-                               ^
-src/main/java/com/example/bankapp/BankappApplication.java:4: error: package org.springframework.boot.autoconfigure does not exist
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-                                             ^
-src/main/java/com/example/bankapp/BankappApplication.java:6: error: cannot find symbol
-@SpringBootApplication
- ^
-  symbol: class SpringBootApplication
-src/main/java/com/example/bankapp/BankappApplication.java:10: error: cannot find symbol
-                SpringApplication.run(BankappApplication.class, args);
-                ^
-  symbol:   variable SpringApplication
-  location: class BankappApplication
-4 errors
-The command '/bin/sh -c javac src/main/java/com/example/bankapp/*.java -d out' returned a non-zero code: 1
-ubuntu@Server:~/Blue-Green-d$ ^C
-ubuntu@Server:~/Blue-Green-d$ rm pom.xml
-ubuntu@Server:~/Blue-Green-d$ nano pom.xml
-ubuntu@Server:~/Blue-Green-d$
+    <distributionManagement>
+        <repository>
+            <id>maven-releases</id>
+            <url>http://52.231.105.11:8081/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>maven-snapshots</id>
+            <url>http://52.231.105.11:8081/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>
