@@ -1,16 +1,14 @@
-FROM eclipse-temurin:17-jdk-alpine
+# Use a base image with Java
+FROM openjdk:17-jdk-slim
 
-EXPOSE 8080
+# Set the working directory
+WORKDIR /app
 
-# Set the working directory in the container
-ENV APP_HOME /usr/src/app
-WORKDIR $APP_HOME
+# Copy your source code
+COPY . .
 
-# Copy the source code into the container
-COPY src/ $APP_HOME/src/
+# Compile the Java files (assuming your main class is Main.java)
+RUN javac src/main/java/com/example/Main.java
 
-# Compile the Java files
-RUN javac src/*.java
-
-# Run the compiled Java program (replace MainClass with your actual main class)
-CMD ["java", "src.MainClass"]
+# Run the application (replace with your main class)
+CMD ["java", "-cp", "src/main/java", "com.example.Main"]
