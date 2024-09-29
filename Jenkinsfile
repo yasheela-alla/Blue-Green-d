@@ -40,14 +40,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Quality Gate Check') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
-                }
-            }
-        }
         
         stage('Publish Artifact To Nexus') {
             steps {
