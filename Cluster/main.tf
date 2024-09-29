@@ -1,31 +1,31 @@
 # Resource Group
-resource "azurerm_resource_group" "yasheela_rg" {
+resource "azurerm_resource_group" "r_grp" {
   name     = var.resource_group_name
   location = var.location
 }
 
 # Virtual Network
-resource "azurerm_virtual_network" "yasheela_vnet" {
-  name                = "yasheela-vnet"
+resource "azurerm_virtual_network" "y_vnet" {
+  name                = "y-vnet"
   address_space       = [var.vnet_cidr]
   location            = var.location
-  resource_group_name = azurerm_resource_group.r-grp.name
+  resource_group_name = azurerm_resource_group.r_grp.name
 }
 
 # Subnets
-resource "azurerm_subnet" "yasheela_subnet" {
+resource "azurerm_subnet" "y_subnet" {
   count                 = 2
-  name                  = "yasheela-subnet-${count.index}"
-  resource_group_name   = azurerm_resource_group.yasheela_rg.name
-  virtual_network_name  = azurerm_virtual_network.yasheela_vnet.name
+  name                  = "y-subnet-${count.index}"
+  resource_group_name   = azurerm_resource_group.r_grp.name
+  virtual_network_name  = azurerm_virtual_network.y_vnet.name
   address_prefixes      = [element(var.subnet_prefix, count.index)]
 }
 
 # Network Security Group for AKS Cluster
-resource "azurerm_network_security_group" "yasheela_nsg" {
-  name                = "yasheela-nsg"
+resource "azurerm_network_security_group" "y_nsg" {
+  name                = "y-nsg"
   location            = var.location
-  resource_group_name = azurerm_resource_group.r-grp.name
+  resource_group_name = azurerm_resource_group.r_grp.name
 
   security_rule {
     name                       = "AllowAllOutbound"
@@ -41,17 +41,17 @@ resource "azurerm_network_security_group" "yasheela_nsg" {
 }
 
 # AKS Cluster
-resource "azurerm_kubernetes_cluster" "yasheela_aks" {
-  name                = "yasheela-aks"
+resource "azurerm_kubernetes_cluster" "y_aks" {
+  name                = "y-aks"
   location            = var.location
-  resource_group_name = azurerm_resource_group.r-grp.name
-  dns_prefix          = "yasheelaaks"
+  resource_group_name = azurerm_resource_group.r_grp.name
+  dns_prefix          = "yaks"
 
   default_node_pool {
-    name       = "default"
-    node_count = var.node_count
-    vm_size    = "Standard_DS2_v2"
-    vnet_subnet_id = azurerm_subnet.yasheela_subnet[0].id
+    name            = "default"
+    node_count      = var.node_count
+    vm_size         = "Standard_DS2_v2"
+    vnet_subnet_id  = azurerm_subnet.y_subnet[0].id
   }
 
   identity {
@@ -63,14 +63,14 @@ resource "azurerm_kubernetes_cluster" "yasheela_aks" {
     network_policy = "calico"
   }
 
-  depends_on = [azurerm_subnet.yasheela_subnet]
+  depends_on = [azurerm_subnet.y_subnet]
 }
 
 # SSH Key for Node Access
-resource "azurerm_ssh_public_key" "Server_ssh_key" {
-  name                = "yasheela-ssh-key"
+resource "azurerm_ssh_public_key" "y_ssh_key" {
+  name                = "y-ssh-key"
   location            = var.location
-  resource_group_name = azurerm_resource_group.r-grp.name
+  resource_group_name = azurerm_resource_group.r_grp.name
   public_key          = file(var.ssh_key_name)
 }
 
@@ -83,8 +83,8 @@ resource "azurerm_network_security_rule" "allow_ssh" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefix        = "*"
+  source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = azurerm_resource_group.r-grp.name
-  network_security_group_name = azurerm_network_security_group.yasheela_nsg.name
+  resource_group_name         = azurerm_resource_group.r_grp.name
+  network_security_group_name = azurerm_network_security_group.y_nsg.name
 }
