@@ -26,6 +26,7 @@
 		<tag/>
 		<url/>
 	</scm>
+	<packaging>jar</packaging>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
@@ -90,5 +91,5 @@
             <url>http://52.231.105.11:8081/repository/maven-snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
-
+    
 </project>
