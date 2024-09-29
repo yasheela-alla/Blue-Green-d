@@ -1,15 +1,9 @@
-output "vm_id" {
-  value = azurerm_linux_virtual_machine.Server.id
+output "aks_cluster_name" {
+  description = "Name of the AKS Cluster"
+  value       = azurerm_kubernetes_cluster.y_aks.name
 }
 
-output "public_ip" {
-  value = azurerm_public_ip.Server_ip.id
-}
-
-output "resource_group" {
-  value = azurerm_resource_group.r_grp.name
-}
-
-output "network_interface_ids" {
-  value = azurerm_network_interface.Server_nic.id
+output "aks_node_resource_group" {
+  description = "Resource group for the AKS nodes"
+  value       = azurerm_kubernetes_cluster.y_aks.node_resource_group
 }

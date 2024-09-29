@@ -1,61 +1,83 @@
-provider "azurerm" {
-  features {}
-}
-
 # Resource Group
 resource "azurerm_resource_group" "r_grp" {
-  name     = "r-grp"
-  location = "Japan East"
+  name     = var.resource_group_name
+  location = var.location
 }
 
 # Virtual Network
-resource "azurerm_virtual_network" "vnet" {
-  name                = "vnet"
-  address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.r_grp.location
+resource "azurerm_virtual_network" "y_vnet" {
+  name                = "y-vnet"
+  address_space       = [var.vnet_cidr]
+  location            = var.location
   resource_group_name = azurerm_resource_group.r_grp.name
 }
 
-# Subnet
-resource "azurerm_subnet" "subnet" {
-  name                 = "subnet"
-  resource_group_name  = azurerm_resource_group.r_grp.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+# Subnets
+resource "azurerm_subnet" "y_subnet" {
+  count                 = 2
+  name                  = "y-subnet-${count.index}"
+  resource_group_name   = azurerm_resource_group.r_grp.name
+  virtual_network_name  = azurerm_virtual_network.y_vnet.name
+  address_prefixes      = [element(var.subnet_prefix, count.index)]
 }
 
-# Network Interface
-resource "azurerm_network_interface" "nic" {
-  name                = "server711_z1"
-  location            = azurerm_resource_group.r_grp.location
+# Network Security Group for AKS Cluster
+resource "azurerm_network_security_group" "y_nsg" {
+  name                = "y-nsg"
+  location            = var.location
   resource_group_name = azurerm_resource_group.r_grp.name
 
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
+  security_rule {
+    name                       = "AllowAllOutbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
   }
 }
 
-# Public IP
-resource "azurerm_public_ip" "public_ip" {
-  name                = "server_public_ip"
-  location            = azurerm_resource_group.r_grp.location
+# AKS Cluster
+resource "azurerm_kubernetes_cluster" "y_aks" {
+  name                = "y-aks"
+  location            = var.location
   resource_group_name = azurerm_resource_group.r_grp.name
-  allocation_method   = "Dynamic"
+  dns_prefix          = "yaks"
+
+  default_node_pool {
+    name            = "default"
+    node_count      = var.node_count
+    vm_size         = "Standard_DS2_v2"
+    vnet_subnet_id  = azurerm_subnet.y_subnet[0].id
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    network_policy = "calico"
+  }
+
+  depends_on = [azurerm_subnet.y_subnet]
 }
 
-# Network Security Group
-resource "azurerm_network_security_group" "nsg" {
-  name                = "server-nsg"
-  location            = azurerm_resource_group.r_grp.location
+# SSH Key for Node Access
+resource "azurerm_ssh_public_key" "y_ssh_key" {
+  name                = "y-ssh-key"
+  location            = var.location
   resource_group_name = azurerm_resource_group.r_grp.name
+  public_key          = file(var.ssh_key_name)
 }
 
-# NSG Rule to Allow SSH
+# Node Security Group for SSH Access
 resource "azurerm_network_security_rule" "allow_ssh" {
-  name                        = "allow_ssh"
-  priority                    = 1001
+  name                        = "SSHAllowRule"
+  priority                    = 101
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
@@ -63,55 +85,6 @@ resource "azurerm_network_security_rule" "allow_ssh" {
   destination_port_range      = "22"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  network_security_group_name = azurerm_network_security_group.nsg.name
-}
-
-# Virtual Machine
-resource "azurerm_linux_virtual_machine" "vm" {
-  name                = "Server"
-  resource_group_name = azurerm_resource_group.r_grp.name
-  location            = azurerm_resource_group.r_grp.location
-  size                = "Standard_D4s_v3"
-  admin_username      = "ubuntu"
-
-  network_interface_ids = [
-    azurerm_network_interface.nic.id
-  ]
-
-  os_disk {
-    name              = "Server_OsDisk"
-    caching           = "ReadWrite"
-    storage_account_type = "Premium_LRS"
-    disk_size_gb      = 30
-  }
-
-  source_image_reference {
-    publisher = "canonical"
-    offer     = "ubuntu-24_04-lts"
-    sku       = "server"
-    version   = "latest"
-  }
-
-  disable_password_authentication = true
-
-  admin_ssh_key {
-    username   = "ubuntu"
-    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCqStzY7XfVrPLYDcRgDfMRTBQa1q0jdqljjPz7P8zJnANLq75DUkBVTfXBvL+rppKZzZL7/yLFOghXg27hL7sguBliaEN+VIaQyP810stkg8EAKUEEjxMa7jiYXgTfI5H9xCXkdkiEuNteBkDwIpV9pItnDsaSi7M7mRMAXpNGoimg+iSpaxsxYEfN5VCdPpFwhrv5pTffNjXAbogpf28uIHcljgw9PhkB1Ti0QlR7rx4cOl7BEJ0c/ma7VuNidccd6yWQP1p6O6OH6ljZkvmTbp3sF1uXg4mhBMHRL3VoQaNLHYgMc/aoUn63bBHinDEAFYEr5EmukffAkilv8CPumOngmnB8Wuh47NoEXsw9Mw+IXBCIF9RXZtbktS9x4HC9gxmYp9XUH8I39gXGJdwsXfci4u9HOyc83H5Y9e7as02wDe4awfYwjlKS/l+xgxlQ56eVNbZGxw+L3dd1My81UhMlmbUc3gqgBLC1SHQHPpglHXOlpVomWRl0d06DOoU= generated-by-azure"
-  }
-
-  boot_diagnostics {
-    enabled = true
-  }
-
-  security_profile {
-    uefi_settings {
-      secure_boot_enabled = true
-      v_tpm_enabled       = true
-    }
-    security_type = "TrustedLaunch"
-  }
-
-  tags = {
-    environment = "production"
-  }
+  resource_group_name         = azurerm_resource_group.r_grp.name
+  network_security_group_name = azurerm_network_security_group.y_nsg.name
 }
