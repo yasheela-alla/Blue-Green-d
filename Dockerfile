@@ -1,14 +1,11 @@
-# Use a base image with Java
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk-alpine
+    
+EXPOSE 8080
+ 
+ENV APP_HOME /usr/src/app
 
-# Set the working directory
-WORKDIR /app
+COPY target/*.jar $APP_HOME/app.jar
 
-# Copy your source code
-COPY . .
+WORKDIR $APP_HOME
 
-# Compile the Java files (assuming your main class is Main.java)
-RUN javac src/main/java/com/example/Main.java
-
-# Run the application (replace with your main class)
-CMD ["java", "-cp", "src/main/java", "com.example.Main"]
+CMD ["java", "-jar", "app.jar"]
