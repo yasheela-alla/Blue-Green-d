@@ -71,7 +71,7 @@ resource "azurerm_ssh_public_key" "y_ssh_key" {
   name                = "y-ssh-key"
   location            = var.location
   resource_group_name = azurerm_resource_group.r_grp.name
-  public_key          = file(var.ssh_key_name)
+  public_key          = file("~/.ssh/id_rsa.pub")  # Updated to reference the correct path
 }
 
 # Node Security Group for SSH Access
