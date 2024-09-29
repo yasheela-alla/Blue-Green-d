@@ -45,26 +45,6 @@ pipeline {
             }
         }
         
-        stage('Docker build & Tag Image') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-cred') {
-                        sh "docker build -t ${IMAGE_NAME}:${TAG} ."
-                    }
-                }
-            }
-        }
-        
-        stage('Deploy MySQL Deployment and Service') {
-            steps {
-                script {
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
-                        sh "kubectl apply -f mysql-ds.yml -n ${KUBE_NAMESPACE}"  // Ensure you have the MySQL deployment YAML ready
-                    }
-                }
-            }
-        }
-        
         stage('Deploy SVC-APP') {
             steps {
                 script {
