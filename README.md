@@ -70,21 +70,80 @@ To switch between Blue and Green environments, use the following commands:
 
 ## Deployment Process
 
-1. **Prepare the Green environment** with the new version of the application.
-2. **Run tests** to ensure the Green environment works as expected.
-3. **Switch traffic** to the Green environment using the commands above.
-4. **Monitor** the performance and logs of the Green environment.
-5. If issues arise, quickly **rollback** to the Blue environment.
+The deployment process for the Blue-Green Deployment strategy is organized into several clear stages, integrated into a CI/CD pipeline. This ensures a smooth transition from the development phase to production. The stages are as follows:
 
-## Contributing
+## Deployment Process
 
-Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+The deployment process for the Blue-Green Deployment strategy is structured into several stages within the CI/CD pipeline, ensuring a seamless transition from development to production. The stages are as follows:
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/YourFeature`).
-3. Commit your changes (`git commit -m 'Add some feature'`).
-4. Push to the branch (`git push origin feature/YourFeature`).
-5. Open a pull request.
+### 1. **Code Checkout**
+   - Developers push code changes to the repository.
+   - The CI/CD pipeline is triggered, checking out the latest code:
+     ```bash
+     git checkout main
+     ```
+
+### 2. **SonarQube Analysis**
+   - Perform static code analysis using SonarQube to ensure code quality and maintainability.
+   - Any issues are reported, and developers must address them before proceeding.
+
+### 3. **Build Stage**
+   - **Docker Build:**
+     - Build the Docker image from the updated code:
+       ```bash
+       docker build -t your-image-name:latest .
+       ```
+
+   - **Docker Push:**
+     - Push the newly built image to a container registry:
+       ```bash
+       docker push your-image-name:latest
+       ```
+
+### 4. **Security Scanning**
+   - **Trivy Scan:**
+     - Scan the Docker image for vulnerabilities using Trivy:
+       ```bash
+       trivy image your-image-name:latest
+       ```
+   - Review scan results and address any critical vulnerabilities.
+
+### 5. **Database Setup**
+   - **MySQL Service Deployment:**
+     - Deploy or update the MySQL service required by the application. Ensure the database schema is up to date.
+
+### 6. **Deploy to Green Environment**
+   - Deploy the application using Kubernetes manifests to the Green environment:
+     ```bash
+     kubectl apply -f k8s/green-deployment.yaml
+     ```
+
+### 7. **Traffic Switch**
+   - Once deployed, switch the production traffic to the Green environment:
+     ```bash
+     kubectl apply -f k8s/green-service.yaml
+     ```
+
+### 8. **Verification Stage**
+   - Verify the deployment by conducting:
+     - **Smoke Tests:** Check basic functionality.
+     - **End-to-End Tests:** Ensure the entire application workflow functions correctly.
+     - **Load Testing:** Validate performance under expected load.
+
+### 9. **Monitoring and Validation**
+   - Monitor the application using monitoring tools (e.g., Prometheus, Grafana) to track metrics and logs.
+   - Gather user feedback to identify any issues.
+
+### 10. **Rollback (if needed)**
+   - If issues are detected, quickly rollback to the Blue environment:
+     ```bash
+     kubectl apply -f k8s/blue-service.yaml
+     ```
+
+### 11. **Cleanup Stage**
+   - After successful validation and stabilization of the Green environment, decommission the Blue environment or prepare it for the next deployment cycle.
+
+
 
 ## License
 
@@ -93,12 +152,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgements
 
 - [Blue-Green Deployment](https://martinfowler.com/bliki/BlueGreenDeployment.html) - Martin Fowler
+- [Aditya](https://github.com/jaiswaladi246)
 - Other resources and inspirations.
 ```
 
-### Instructions for Use
-- Replace `path/to/architecture-diagram.png` with the actual path to your architecture diagram image.
-- Update the repository link, Docker image names, and any other specific details related to your project.
-- Make sure to include any additional sections as needed for your project.
-
-Feel free to ask if you need any more adjustments!
