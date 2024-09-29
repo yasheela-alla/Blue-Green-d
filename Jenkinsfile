@@ -45,36 +45,6 @@ pipeline {
             }
         }
         
-        stage('Deploy SVC-APP') {
-            steps {
-                script {
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
-                        sh """ if ! kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}; then
-                                kubectl apply -f bankapp-service.yml -n ${KUBE_NAMESPACE}
-                              fi
-                        """
-                   }
-                }
-            }
-        }
-        
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    def deploymentFile = ""
-                    if (params.DEPLOY_ENV == 'blue') {
-                        deploymentFile = 'app-deployment-blue.yml'
-                    } else {
-                        deploymentFile = 'app-deployment-green.yml'
-                    }
-
-                    withKubeConfig(caCertificate: '', clusterName: 'AksCluster', contextName: '', credentialsId: 'k8-token', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'akscluster-dns-5zu2vc1m.hcp.australiaeast.azmk8s.io') {
-                        sh "kubectl apply -f ${deploymentFile} -n ${KUBE_NAMESPACE}"
-                    }
-                }
-            }
-        }
-        
         stage('Switch Traffic Between Blue & Green Environment') {
             when {
                 expression { return params.SWITCH_TRAFFIC }
