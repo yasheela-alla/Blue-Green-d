@@ -60,27 +60,31 @@ pipeline {
                 }
             }
         }
-
         stage('Verify Deployment') {
-            steps {
-                script {
-                    def verifyEnv = params.DEPLOY_ENV
+    steps {
+        script {
+            def verifyEnv = params.DEPLOY_ENV
+            withKubeConfig(credentialsId: 'k8-token', namespace: 'webapps') {
+                // Debugging output
+                echo "Attempting to retrieve pod status for environment: ${verifyEnv}"
 
-                    withKubeConfig(credentialsId: 'k8-token', namespace: 'webapps') {
-                        // Check the status of the pods
-                        def podStatus = sh(script: "kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE} -o jsonpath='{.items[*].status.phase}'", returnStdout: true).trim()
+                try {
+                    def podStatus = sh(script: "kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE} -o jsonpath='{.items[*].status.phase}'", returnStdout: true).trim()
 
-                        if (podStatus.contains('Running')) {
-                            sh """
-                            kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
-                            kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
-                            """
-                        } else {
-                            error "Pod is not running. Current status: ${podStatus}"
-                        }
+                    if (podStatus.contains('Running')) {
+                        sh """
+                        kubectl get pods -l version=${verifyEnv} -n ${KUBE_NAMESPACE}
+                        kubectl get svc bankapp-service -n ${KUBE_NAMESPACE}
+                        """
+                    } else {
+                        error "Pod is not running. Current status: ${podStatus}"
+                    }
+                } catch (Exception e) {
+                    error "Failed to retrieve pod status: ${e.message}"
                     }
                 }
-            }
+             }
+           }
         }
     } // Closing the stages block
 } // Closing the pipeline block
