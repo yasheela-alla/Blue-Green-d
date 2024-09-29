@@ -55,22 +55,6 @@ pipeline {
             }
         }
         
-        stage('Trivy Image Scan') {
-            steps {
-                sh "trivy image --format table -o image.html ${IMAGE_NAME}:${TAG}"
-            }
-        }
-        
-        stage('Docker Push Image') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-cred') {
-                        sh "docker push ${IMAGE_NAME}:${TAG} ."
-                    }
-                }
-            }
-        }
-        
         stage('Deploy MySQL Deployment and Service') {
             steps {
                 script {
