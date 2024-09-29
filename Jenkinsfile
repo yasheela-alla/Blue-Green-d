@@ -63,7 +63,8 @@ pipeline {
         
         stage('Verify Deployment') {
             steps {
-            sh "mvn test -DskipTests=true"
-        }
-    } // Closing the stages block
-} // Closing the pipeline block
+                sh "mvn test -DskipTests=true"
+         }
+      } // Closing the stages block
+   } // Closing the pipeline block
+}
