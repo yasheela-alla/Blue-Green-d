@@ -1,5 +1,4 @@
 
-```markdown
 # Blue-Green Deployment
 
 ## Overview
